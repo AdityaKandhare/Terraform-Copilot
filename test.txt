@@ -1,0 +1,32 @@
+python -m uvicorn app.main:app --reload
+
+http://127.0.0.1:8000/docs
+
+/generate
+
+Create an S3 bucket
+
+Create an S3 bucket and a Lambda function that processes files
+
+
+/fix
+
+resource "aws_s3_bucket" "test" {
+bucket = my-bucket
+}
+
+
+/explain
+
+provider "aws" {
+  region = "us-west-2"
+}
+
+resource "aws_s3_bucket" "bucket" {
+  bucket = "my-bucket"
+  acl    = "private"
+}
+
+
+
+
