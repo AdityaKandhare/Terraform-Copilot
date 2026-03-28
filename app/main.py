@@ -1,20 +1,33 @@
 from fastapi import FastAPI
-from app.llm import generate_terraform, fix_terraform
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from app.llm import generate_terraform, fix_terraform, explain_terraform
 from app.evaluator import validate_terraform
+from app.schemas import CodeInput
 import json
-from app.llm import explain_terraform
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+def root():
+    return FileResponse("static/ui.html")
 
 
 @app.get("/generate")
 def generate(prompt: str):
     raw_output = generate_terraform(prompt)
 
-    # 🔥 Clean LLM output
     clean_output = raw_output.strip()
-
-    # remove markdown ```json ``` if present
     if clean_output.startswith("```"):
         clean_output = clean_output.split("```")[1]
 
@@ -24,13 +37,10 @@ def generate(prompt: str):
         print("RAW OUTPUT:", raw_output)
         return {"error": "Invalid LLM output"}
 
-    # ✅ Validate Terraform
     is_valid, message = validate_terraform(data.get("terraform", {}))
-
     if not is_valid:
         return {"error": message}
 
-    # ✅ Save formatted output
     with open("terraform_output/main.tf", "w") as f:
         f.write(data["terraform"])
 
@@ -42,12 +52,10 @@ def generate(prompt: str):
 
 
 @app.post("/fix")
-def fix(code: str):
-    raw_output = fix_terraform(code)
+def fix(body: CodeInput):
+    raw_output = fix_terraform(body.code)
 
-    # 🔥 Clean LLM output
     clean_output = raw_output.strip()
-
     if clean_output.startswith("```"):
         clean_output = clean_output.split("```")[1]
 
@@ -59,12 +67,12 @@ def fix(code: str):
 
     return data
 
+
 @app.post("/explain")
-def explain(code: str):
-    raw_output = explain_terraform(code)
+def explain(body: CodeInput):
+    raw_output = explain_terraform(body.code)
 
     clean_output = raw_output.strip()
-
     if clean_output.startswith("```"):
         clean_output = clean_output.split("```")[1]
 

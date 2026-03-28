@@ -2,42 +2,49 @@ provider "aws" {
   region = "us-west-2"
 }
 
-resource "aws_s3_bucket" "my_bucket" {
-  bucket = "my-bucket"
-  acl = "private"
-
-  versioning {
-    enabled = true
-  }
+resource "aws_ecs_cluster" "fargate_cluster" {
+  name = "fargate-cluster"
 }
 
-resource "aws_lambda_function" "process_files" {
-  filename = "lambda_function_payload.zip"
-  function_name = "process_files"
-  role = aws_iam_role.iam_for_lambda.arn
-  handler = "exports.test"
-
-  source_code_hash = filebase64sha256("lambda_function_payload.zip")
-
-  runtime = "nodejs12.x"
-}
-
-resource "aws_iam_role" "iam_for_lambda" {
-  name = "iam_for_lambda"
-
-  assume_role_policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
+resource "aws_ecs_task_definition" "app_task" {
+  family                   = "app-task"
+  container_definitions    = jsonencode([
     {
-      "Action": "sts:AssumeRole",
-      "Principal": {
-        "Service": "lambda.amazonaws.com"
-      },
-      "Effect": "Allow",
-      "Sid": ""
+      name      = "app-container"
+      image     = "nginx"
+      cpu       = 256
+      memory    = 512
+      essential = true
     }
-  ]
+  ])
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = "256"
+  memory                   = "512"
 }
-EOF
+
+resource "aws_lb" "app_lb" {
+  name               = "app-lb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = []
+  subnets            = []
+}
+
+resource "aws_lb_target_group" "app_tg" {
+  name     = "app-tg"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = "vpc-123456"
+}
+
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.app_lb.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app_tg.arn
+  }
 }

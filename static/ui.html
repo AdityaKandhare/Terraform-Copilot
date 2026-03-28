@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TerraForge — AI DevOps Assistant</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap');
+
+  :root {
+    --bg:        #0a0c0f;
+    --surface:   #111318;
+    --border:    #1e2230;
+    --border2:   #2a2f42;
+    --accent:    #00e5a0;
+    --accent2:   #0066ff;
+    --warn:      #ff6b35;
+    --text:      #e8eaf0;
+    --muted:     #5a6070;
+    --code-bg:   #0d1117;
+    --glow:      0 0 24px rgba(0,229,160,.18);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,160,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,160,.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  header {
+    position: relative; z-index: 10;
+    border-bottom: 1px solid var(--border);
+    padding: 0 40px;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 64px;
+    background: rgba(10,12,15,.8);
+    backdrop-filter: blur(12px);
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 18px; font-weight: 800; letter-spacing: -.5px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: grid; place-items: center;
+    font-size: 16px;
+  }
+  .logo span { color: var(--accent); }
+  .status-pill {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 20px;
+    border: 1px solid var(--border2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--muted);
+  }
+  .status-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50%      { opacity: .3; }
+  }
+
+  .app {
+    position: relative; z-index: 1;
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    min-height: calc(100vh - 64px);
+  }
+
+  .sidebar {
+    border-right: 1px solid var(--border);
+    padding: 28px 16px;
+    display: flex; flex-direction: column; gap: 6px;
+    background: rgba(17,19,24,.5);
+  }
+  .sidebar-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
+    color: var(--muted); text-transform: uppercase;
+    padding: 0 10px; margin-bottom: 6px;
+  }
+  .tab-btn {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 8px;
+    border: none; background: transparent;
+    color: var(--muted); cursor: pointer;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px; font-weight: 500;
+    text-align: left; width: 100%;
+    transition: all .15s;
+  }
+  .tab-btn:hover { background: var(--border); color: var(--text); }
+  .tab-btn.active {
+    background: rgba(0,229,160,.1);
+    color: var(--accent);
+    border: 1px solid rgba(0,229,160,.2);
+  }
+  .tab-icon { font-size: 15px; }
+  .tab-method {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; font-weight: 700;
+    padding: 2px 6px; border-radius: 4px;
+    background: var(--border2);
+  }
+  .tab-btn.active .tab-method { background: rgba(0,229,160,.2); }
+  .sidebar-divider { height: 1px; background: var(--border); margin: 12px 0; }
+  .sidebar-footer {
+    margin-top: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--muted);
+    padding: 0 10px; line-height: 1.7;
+  }
+
+  .main {
+    padding: 36px 48px;
+    display: flex; flex-direction: column; gap: 24px;
+    overflow-y: auto;
+  }
+  .panel { display: none; }
+  .panel.active { display: flex; flex-direction: column; gap: 20px; }
+  .panel-header { display: flex; align-items: flex-start; justify-content: space-between; }
+  .panel-title { font-size: 22px; font-weight: 800; letter-spacing: -.5px; }
+  .panel-title span { color: var(--accent); }
+  .panel-subtitle {
+    font-size: 13px; color: var(--muted); margin-top: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .endpoint-badge {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 6px;
+    border: 1px solid var(--border2);
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--muted);
+  }
+  .method { font-weight: 700; color: var(--accent); margin-right: 2px; }
+
+  .input-card {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 12px; overflow: hidden;
+  }
+  .input-card-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 600; letter-spacing: 1px;
+    color: var(--muted); text-transform: uppercase;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border2); }
+  textarea, input[type=text] {
+    width: 100%; background: var(--code-bg);
+    border: none; outline: none; color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; line-height: 1.6;
+    padding: 16px 20px; resize: vertical; min-height: 80px;
+  }
+  textarea::placeholder, input::placeholder { color: var(--muted); }
+  textarea:focus, input:focus { background: #0f1520; }
+
+  .run-btn {
+    align-self: flex-start;
+    display: flex; align-items: center; gap: 8px;
+    padding: 11px 24px; border-radius: 8px;
+    border: none; cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), #00b87a);
+    color: #000; font-family: 'Syne', sans-serif;
+    font-size: 13px; font-weight: 700; letter-spacing: .3px;
+    transition: all .2s;
+  }
+  .run-btn:hover { transform: translateY(-1px); box-shadow: var(--glow); }
+  .run-btn:active { transform: translateY(0); }
+  .run-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+  .run-btn .spinner {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid rgba(0,0,0,.3); border-top-color: #000;
+    animation: spin .6s linear infinite; display: none;
+  }
+  .run-btn.loading .spinner { display: block; }
+  .run-btn.loading .btn-text { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .output-area { display: flex; flex-direction: column; gap: 12px; }
+  .output-card {
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 12px; overflow: hidden;
+    animation: fadeIn .3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .output-card-header {
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 600; letter-spacing: 1px;
+    color: var(--muted); text-transform: uppercase;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .copy-btn {
+    background: none; border: 1px solid var(--border2);
+    color: var(--muted); padding: 3px 10px; border-radius: 4px;
+    font-size: 10px; font-family: 'JetBrains Mono', monospace;
+    cursor: pointer; transition: all .15s;
+  }
+  .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .copy-btn.copied { border-color: var(--accent); color: var(--accent); }
+
+  .code-block {
+    background: var(--code-bg); padding: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px; line-height: 1.7; color: #c9d1d9;
+    overflow-x: auto; white-space: pre;
+    max-height: 380px; overflow-y: auto;
+  }
+  .code-block .kw  { color: #ff7b72; }
+  .code-block .str { color: #a5d6ff; }
+  .code-block .num { color: #79c0ff; }
+  .code-block .cmt { color: #8b949e; }
+
+  .explanation-block {
+    padding: 16px 20px; font-size: 13px; line-height: 1.7;
+    color: #a0a8b8; font-family: 'JetBrains Mono', monospace;
+  }
+  .explanation-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    color: var(--accent); text-transform: uppercase; margin-bottom: 6px;
+  }
+  .error-block {
+    padding: 14px 18px;
+    background: rgba(255,107,53,.08); border: 1px solid rgba(255,107,53,.3);
+    border-radius: 8px; font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; color: var(--warn);
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .validation-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 20px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
+  }
+  .validation-ok   { background: rgba(0,229,160,.1); border: 1px solid rgba(0,229,160,.3); color: var(--accent); }
+  .validation-fail { background: rgba(255,107,53,.1); border: 1px solid rgba(255,107,53,.3); color: var(--warn); }
+  .empty-state {
+    text-align: center; padding: 60px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; color: var(--muted);
+    border: 1px dashed var(--border2); border-radius: 12px;
+  }
+  .empty-icon { font-size: 32px; margin-bottom: 12px; }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  .history-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 16px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    transition: border-color .15s;
+  }
+  .history-item:hover { border-color: var(--border2); }
+  .history-prompt { font-size: 13px; font-family: 'JetBrains Mono', monospace; }
+  .history-meta { font-size: 10px; color: var(--muted); margin-top: 3px; font-family: 'JetBrains Mono', monospace; }
+  .history-type {
+    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace; white-space: nowrap;
+  }
+  .type-generate { background: rgba(0,229,160,.1); color: var(--accent); }
+  .type-fix      { background: rgba(0,102,255,.1);  color: #6699ff; }
+  .type-explain  { background: rgba(255,107,53,.1); color: var(--warn); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    Terra<span>Forge</span>
+  </div>
+  <div class="status-pill">
+    <div class="status-dot"></div>
+    <span id="api-status">connecting…</span>
+  </div>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-label">Endpoints</div>
+    <button class="tab-btn active" onclick="switchTab('generate', this)">
+      <span class="tab-icon">✦</span> Generate
+      <span class="tab-method">GET</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('fix', this)">
+      <span class="tab-icon">⚙</span> Fix
+      <span class="tab-method">POST</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('explain', this)">
+      <span class="tab-icon">◎</span> Explain
+      <span class="tab-method">POST</span>
+    </button>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-label">Tools</div>
+    <button class="tab-btn" onclick="switchTab('history', this)">
+      <span class="tab-icon">▤</span> History
+    </button>
+    <div class="sidebar-footer">
+      <div>Base URL</div>
+      <div style="color:#e8eaf0">localhost:8000</div>
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">
+        <div>Owner</div>
+        <div style="color:var(--accent);font-weight:600">Aditya Kandhare</div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- GENERATE -->
+    <div class="panel active" id="panel-generate">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Generate <span>Terraform</span></div>
+          <div class="panel-subtitle">Natural language → HCL infrastructure code</div>
+        </div>
+        <div class="endpoint-badge"><span class="method">GET</span> /generate?prompt=…</div>
+      </div>
+      <div class="input-card">
+        <div class="input-card-header"><div class="dot"></div> Prompt</div>
+        <textarea id="gen-input" rows="3" placeholder="e.g. Create an S3 bucket with versioning and a Lambda function that processes files"></textarea>
+      </div>
+      <button class="run-btn" id="gen-btn" onclick="runGenerate()">
+        <div class="spinner"></div><span class="btn-text">▶ Run Generate</span>
+      </button>
+      <div class="output-area" id="gen-output">
+        <div class="empty-state"><div class="empty-icon">◈</div>Output will appear here</div>
+      </div>
+    </div>
+
+    <!-- FIX -->
+    <div class="panel" id="panel-fix">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Fix <span>Terraform</span></div>
+          <div class="panel-subtitle">Paste broken HCL — get a corrected version back</div>
+        </div>
+        <div class="endpoint-badge"><span class="method">POST</span> /fix</div>
+      </div>
+      <div class="input-card">
+        <div class="input-card-header"><div class="dot"></div> Broken Terraform Code</div>
+        <textarea id="fix-input" rows="8" placeholder='resource "aws_s3_bucket" "test" {&#10;  bucket = my-bucket&#10;}'></textarea>
+      </div>
+      <button class="run-btn" id="fix-btn" onclick="runFix()">
+        <div class="spinner"></div><span class="btn-text">▶ Run Fix</span>
+      </button>
+      <div class="output-area" id="fix-output">
+        <div class="empty-state"><div class="empty-icon">◈</div>Fixed code will appear here</div>
+      </div>
+    </div>
+
+    <!-- EXPLAIN -->
+    <div class="panel" id="panel-explain">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Explain <span>Terraform</span></div>
+          <div class="panel-subtitle">Get a plain-English breakdown of any HCL block</div>
+        </div>
+        <div class="endpoint-badge"><span class="method">POST</span> /explain</div>
+      </div>
+      <div class="input-card">
+        <div class="input-card-header"><div class="dot"></div> Terraform Code</div>
+        <textarea id="explain-input" rows="8" placeholder='provider "aws" {&#10;  region = "us-west-2"&#10;}&#10;&#10;resource "aws_s3_bucket" "bucket" {&#10;  bucket = "my-bucket"&#10;}'></textarea>
+      </div>
+      <button class="run-btn" id="explain-btn" onclick="runExplain()">
+        <div class="spinner"></div><span class="btn-text">▶ Run Explain</span>
+      </button>
+      <div class="output-area" id="explain-output">
+        <div class="empty-state"><div class="empty-icon">◈</div>Explanation will appear here</div>
+      </div>
+    </div>
+
+    <!-- HISTORY -->
+    <div class="panel" id="panel-history">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Request <span>History</span></div>
+          <div class="panel-subtitle">All requests this session</div>
+        </div>
+        <button class="copy-btn" onclick="clearHistory()">Clear all</button>
+      </div>
+      <div id="history-list">
+        <div class="empty-state"><div class="empty-icon">▤</div>No requests yet</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const BASE_URL = 'http://127.0.0.1:8000';
+let requestHistory = [];
+
+// ── raw code store so Copy always gets clean HCL, never HTML ──
+const rawCodeStore = {};
+
+async function checkStatus() {
+  try {
+    const r = await fetch(BASE_URL + '/docs', { signal: AbortSignal.timeout(2000) });
+    document.getElementById('api-status').textContent = r.ok ? 'API online' : 'API unreachable';
+  } catch {
+    document.getElementById('api-status').textContent = 'API offline';
+  }
+}
+checkStatus();
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Syntax highlight ──
+// Step 1: escape all HTML so nothing in the code can inject tags
+// Step 2: apply highlight spans in safe order
+function highlight(code, id) {
+  rawCodeStore[id] = code; // save original for copy
+
+  let s = code
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  // comments first (so quotes inside comments aren't highlighted)
+  s = s.replace(/(#[^\n]*)/g, '<span class="cmt">$1</span>');
+  // keywords
+  s = s.replace(/\b(resource|provider|variable|output|locals|module|data|true|false|null)\b/g,
+    '<span class="kw">$1</span>');
+  // quoted strings (quotes are now &quot; after escaping)
+  s = s.replace(/(&quot;[^&\n]*&quot;)/g, '<span class="str">$1</span>');
+  // numbers
+  s = s.replace(/\b(\d+)\b/g, '<span class="num">$1</span>');
+
+  return s;
+}
+
+function copyCode(id, btn) {
+  const raw = rawCodeStore[id];
+  navigator.clipboard.writeText(raw ?? document.getElementById(id).innerText);
+  btn.textContent = '✓ Copied';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+}
+
+function addHistory(type, prompt, success) {
+  requestHistory.unshift({ type, prompt, success, time: new Date().toLocaleTimeString() });
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = document.getElementById('history-list');
+  if (!requestHistory.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">▤</div>No requests yet</div>';
+    return;
+  }
+  list.innerHTML = requestHistory.map(h => `
+    <div class="history-item">
+      <div>
+        <div class="history-prompt">${h.prompt.substring(0, 80)}${h.prompt.length > 80 ? '…' : ''}</div>
+        <div class="history-meta">${h.time} · ${h.success ? '✓ success' : '✗ error'}</div>
+      </div>
+      <span class="history-type type-${h.type}">${h.type}</span>
+    </div>`).join('');
+}
+
+function clearHistory() { requestHistory = []; renderHistory(); }
+
+function setLoading(btnId, on) {
+  const btn = document.getElementById(btnId);
+  btn.disabled = on;
+  btn.classList.toggle('loading', on);
+}
+
+function renderError(msg) {
+  return `<div class="error-block">⚠ ${msg}</div>`;
+}
+
+function renderCodeCard(label, code, id) {
+  return `
+    <div class="output-card">
+      <div class="output-card-header">
+        <span>◈ ${label}</span>
+        <button class="copy-btn" onclick="copyCode('${id}', this)">Copy</button>
+      </div>
+      <div class="code-block" id="${id}">${highlight(code, id)}</div>
+    </div>`;
+}
+
+function renderExplanationCard(text) {
+  return `
+    <div class="output-card">
+      <div class="explanation-block">
+        <div class="explanation-label">◎ Explanation</div>
+        ${text}
+      </div>
+    </div>`;
+}
+
+async function runGenerate() {
+  const prompt = document.getElementById('gen-input').value.trim();
+  if (!prompt) return;
+  setLoading('gen-btn', true);
+  const out = document.getElementById('gen-output');
+  out.innerHTML = '';
+  try {
+    const r = await fetch(`${BASE_URL}/generate?prompt=${encodeURIComponent(prompt)}`);
+    const data = await r.json();
+    if (data.error) {
+      out.innerHTML = renderError(data.error);
+      addHistory('generate', prompt, false);
+    } else {
+      const valid = data.validation?.toLowerCase().includes('valid');
+      out.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span class="validation-badge ${valid ? 'validation-ok' : 'validation-fail'}">
+            ${valid ? '✓' : '✗'} ${data.validation || 'unknown'}
+          </span>
+        </div>
+        ${renderCodeCard('terraform output', data.terraform || '', 'gen-tf-code')}
+        ${data.explanation ? renderExplanationCard(data.explanation) : ''}`;
+      addHistory('generate', prompt, true);
+    }
+  } catch {
+    out.innerHTML = renderError('Could not reach API — is the server running?');
+    addHistory('generate', prompt, false);
+  }
+  setLoading('gen-btn', false);
+}
+
+async function runFix() {
+  const code = document.getElementById('fix-input').value.trim();
+  if (!code) return;
+  setLoading('fix-btn', true);
+  const out = document.getElementById('fix-output');
+  out.innerHTML = '';
+  try {
+    const r = await fetch(`${BASE_URL}/fix`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const data = await r.json();
+    if (data.error) {
+      out.innerHTML = renderError(data.error);
+      addHistory('fix', code.substring(0, 60), false);
+    } else {
+      out.innerHTML = `
+        ${renderCodeCard('fixed terraform', data.terraform || '', 'fix-tf-code')}
+        ${data.explanation ? renderExplanationCard(data.explanation) : ''}`;
+      addHistory('fix', code.substring(0, 60), true);
+    }
+  } catch {
+    out.innerHTML = renderError('Could not reach API — is the server running?');
+    addHistory('fix', code.substring(0, 60), false);
+  }
+  setLoading('fix-btn', false);
+}
+
+async function runExplain() {
+  const code = document.getElementById('explain-input').value.trim();
+  if (!code) return;
+  setLoading('explain-btn', true);
+  const out = document.getElementById('explain-output');
+  out.innerHTML = '';
+  try {
+    const r = await fetch(`${BASE_URL}/explain`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const data = await r.json();
+    if (data.error) {
+      out.innerHTML = renderError(data.error);
+      addHistory('explain', code.substring(0, 60), false);
+    } else {
+      out.innerHTML = renderExplanationCard(data.explanation || JSON.stringify(data));
+      addHistory('explain', code.substring(0, 60), true);
+    }
+  } catch {
+    out.innerHTML = renderError('Could not reach API — is the server running?');
+    addHistory('explain', code.substring(0, 60), false);
+  }
+  setLoading('explain-btn', false);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'Enter') {
+    const active = document.querySelector('.panel.active').id;
+    if (active === 'panel-generate') runGenerate();
+    else if (active === 'panel-fix') runFix();
+    else if (active === 'panel-explain') runExplain();
+  }
+});
+</script>
+</body>
+</html>
