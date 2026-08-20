@@ -1,0 +1,8 @@
+.env
+__pycache__/
+terraform_output/
+venv/
+.DS_Store
+*.pyc
+CLAUDE.md
+.claude/

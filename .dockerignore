@@ -1,9 +1,16 @@
-.git
 .env
+venv/
 __pycache__/
 *.pyc
+.git/
+.gitignore
+.claude/
 .DS_Store
+Archive.zip
+candidate-*.html
+terraform_output/
 tests/
 test.txt
+*.md
 Dockerfile
 .dockerignore

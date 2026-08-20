@@ -51,3 +51,24 @@ def explain_terraform(code: str):
     )
 
     return response.choices[0].message.content
+
+def fix_terraform_with_error(code: str, error: str) -> str:
+    """Used by the validation retry loop in /generate."""
+    system_prompt = load_prompt("app/prompts/fix_v1.txt")
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": (
+                    f"The following Terraform code failed validation with this error:\n\n"
+                    f"ERROR:\n{error}\n\n"
+                    f"CODE:\n{code}\n\n"
+                    f"Fix the code so it passes terraform validate."
+                )
+            }
+        ]
+    )
+    return response.choices[0].message.content
